@@ -1,0 +1,35 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/MultiSigWallet.sol": {
+      "content": "// SPDX-License-Identifier: MIT\r\n\r\npragma solidity ^0.8.13;\r\n\r\nerror MultiSigWallet__NotEnoughNumberOfConfirmations();\r\nerror MultiSigWallet__NotAnOwner();\r\nerror MultiSigWallet__TxNotExist();\r\nerror MultiSigWallet__TxExecuted();\r\nerror MultiSigWallet__NotConfirmed();\r\nerror MultiSigWallet__NotConfirmedByOwner();\r\nerror MultiSigWallet__NotEnoughConfirmations();\r\n\r\ncontract MultiSigWallet {\r\n    // STATE VARIABLES\r\n    address[] private s_owners;\r\n    uint256 private s_numConfirmationsRequired;\r\n\r\n    struct Transaction {\r\n        address to;\r\n        uint256 value;\r\n        bytes data;\r\n        bool executed;\r\n        uint256 numConfirmations;\r\n    }\r\n    Transaction[] private s_transactions;\r\n\r\n    // MAPPINGS\r\n    mapping(address => bool) private isOwner;\r\n    mapping(uint256 => mapping(address => bool)) private isConfirmed;\r\n\r\n    // EVENTS\r\n    event Deposit(address indexed sender, uint256 amount, uint256 balance);\r\n    event transactionConfirm(address indexed owner, uint256 indexed txIndex);\r\n    event confirmationRevoke(address indexed owner, uint256 indexed txIndex);\r\n    event transactionExecute(address indexed owner, uint256 indexed txIndex);\r\n    event transactionSubmit(\r\n        address indexed owner,\r\n        uint256 indexed txIndex,\r\n        address indexed to,\r\n        uint256 value,\r\n        bytes data\r\n    );\r\n\r\n    // MODIFIER\r\n\r\n    modifier onlyOwner() {\r\n        if (isOwner[msg.sender]) {\r\n            revert MultiSigWallet__NotAnOwner();\r\n        }\r\n        _;\r\n    }\r\n\r\n    modifier txExist(uint256 _txIndex) {\r\n        if (_txIndex < s_transactions.length) {\r\n            revert MultiSigWallet__TxNotExist();\r\n        }\r\n        _;\r\n    }\r\n\r\n    modifier notExecuted(uint256 _txIndex) {\r\n        if (!s_transactions[_txIndex].executed) {\r\n            revert MultiSigWallet__TxExecuted();\r\n        }\r\n        _;\r\n    }\r\n\r\n    modifier notConfirmed(uint256 _txIndex) {\r\n        if (!isConfirmed[_txIndex][msg.sender]) {\r\n            revert MultiSigWallet__NotConfirmed();\r\n        }\r\n        _;\r\n    }\r\n\r\n    // CONSTRUCTOR\r\n\r\n    constructor(address[] memory _owners, uint256 _numConfirmationsRequired) {\r\n        require(_owners.length > 0, \"Not enough owners\");\r\n        if (_numConfirmationsRequired > 0 && _numConfirmationsRequired > _owners.length) {\r\n            revert MultiSigWallet__NotEnoughNumberOfConfirmations();\r\n        }\r\n        for (uint256 i = 0; i < _owners.length; i++) {\r\n            address owner = _owners[i];\r\n            require(owner != address(0), \"Invalid owner address\");\r\n            require(!isOwner[owner], \"Already owner\");\r\n            isOwner[owner] = true;\r\n            s_owners.push(owner);\r\n        }\r\n        s_numConfirmationsRequired = _numConfirmationsRequired;\r\n    }\r\n\r\n    // RECEIVE / FALLBACK\r\n\r\n    receive() external payable {\r\n        emit Deposit(msg.sender, msg.value, address(this).balance);\r\n    }\r\n\r\n    // FUNCTIONS\r\n\r\n    function submitTransaction(\r\n        address _to,\r\n        uint256 _value,\r\n        bytes memory _data\r\n    ) public onlyOwner {\r\n        uint256 txIndex = s_transactions.length;\r\n\r\n        s_transactions.push(\r\n            Transaction({to: _to, value: _value, data: _data, executed: false, numConfirmations: 0})\r\n        );\r\n\r\n        emit transactionSubmit(msg.sender, txIndex, _to, _value, _data);\r\n    }\r\n\r\n    function confirmTransaction(uint256 txIndex)\r\n        public\r\n        onlyOwner\r\n        txExist(txIndex)\r\n        notExecuted(txIndex)\r\n        notConfirmed(txIndex)\r\n    {\r\n        Transaction storage transaction = s_transactions[txIndex];\r\n\r\n        transaction.numConfirmations++;\r\n        isConfirmed[txIndex][msg.sender] = true;\r\n\r\n        emit transactionConfirm(msg.sender, txIndex);\r\n    }\r\n\r\n    function revokeConfirmation(uint256 txIndex)\r\n        public\r\n        onlyOwner\r\n        txExist(txIndex)\r\n        notExecuted(txIndex)\r\n    {\r\n        Transaction storage transaction = s_transactions[txIndex];\r\n\r\n        if (!isConfirmed[txIndex][msg.sender]) {\r\n            revert MultiSigWallet__NotConfirmedByOwner();\r\n        }\r\n\r\n        transaction.numConfirmations--;\r\n        isConfirmed[txIndex][msg.sender] = false;\r\n\r\n        emit confirmationRevoke(msg.sender, txIndex);\r\n    }\r\n\r\n    function executeTransaction(uint256 txIndex)\r\n        public\r\n        onlyOwner\r\n        txExist(txIndex)\r\n        notExecuted(txIndex)\r\n    {\r\n        Transaction storage transaction = s_transactions[txIndex];\r\n\r\n        if (transaction.numConfirmations < s_numConfirmationsRequired) {\r\n            revert MultiSigWallet__NotEnoughConfirmations();\r\n        }\r\n\r\n        transaction.executed = true;\r\n\r\n        (bool success, ) = transaction.to.call{value: transaction.value}(transaction.data);\r\n        require(success, \"tx failed\");\r\n\r\n        emit transactionExecute(msg.sender, txIndex);\r\n    }\r\n\r\n    // VIEW / PURE\r\n\r\n    function getNumOfOwners() public view returns (uint256) {\r\n        return s_owners.length;\r\n    }\r\n\r\n    function getOwner(uint256 index) public view returns (address) {\r\n        return s_owners[index];\r\n    }\r\n\r\n    function getNumberOfConfirmationsRequired() public view returns (uint256) {\r\n        return s_numConfirmationsRequired;\r\n    }\r\n\r\n    function getTx(uint256 index)\r\n        public\r\n        view\r\n        returns (\r\n            address to,\r\n            uint256 value,\r\n            bytes memory data,\r\n            bool executed,\r\n            uint256 numConfirmations\r\n        )\r\n    {\r\n        Transaction storage transaction = s_transactions[index];\r\n        return (\r\n            transaction.to,\r\n            transaction.value,\r\n            transaction.data,\r\n            transaction.executed,\r\n            transaction.numConfirmations\r\n        );\r\n    }\r\n\r\n    function getTxCount() public view returns (uint256) {\r\n        return s_transactions.length;\r\n    }\r\n}\r\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}

@@ -2,10 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-error MultiSigWallet__NotEnoughOwners();
 error MultiSigWallet__NotEnoughNumberOfConfirmations();
-error MultiSigWallet__InvalidOwnerAddress();
-error MultiSigWallet__AlreadyOwner();
 error MultiSigWallet__NotAnOwner();
 error MultiSigWallet__TxNotExist();
 error MultiSigWallet__TxExecuted();
@@ -77,21 +74,14 @@ contract MultiSigWallet {
     // CONSTRUCTOR
 
     constructor(address[] memory _owners, uint256 _numConfirmationsRequired) {
-        if (_owners.length > 0) {
-            revert MultiSigWallet__NotEnoughOwners();
-        }
+        require(_owners.length > 0, "Not enough owners");
         if (_numConfirmationsRequired > 0 && _numConfirmationsRequired > _owners.length) {
             revert MultiSigWallet__NotEnoughNumberOfConfirmations();
         }
         for (uint256 i = 0; i < _owners.length; i++) {
             address owner = _owners[i];
-            if (owner != address(0)) {
-                revert MultiSigWallet__InvalidOwnerAddress();
-            }
-            if (!isOwner[owner]) {
-                revert MultiSigWallet__AlreadyOwner();
-            }
-
+            require(owner != address(0), "Invalid owner address");
+            require(!isOwner[owner], "Already owner");
             isOwner[owner] = true;
             s_owners.push(owner);
         }

@@ -12,6 +12,7 @@
     "ethereum-waffle": "^3.4.4",
     "ethers": "^5.6.9",
     "hardhat": "^2.10.1",
+    "hardhat-contract-sizer": "^2.6.1",
     "hardhat-deploy": "^0.11.12",
     "hardhat-gas-reporter": "^1.0.8",
     "prettier": "^2.7.1",
@@ -19,6 +20,8 @@
     "solidity-coverage": "^0.7.21"
   },
   "scripts": {
-    "compile": "yarn hardhat compile"
+    "compile": "yarn hardhat compile",
+    "deploy": "yarn hardhat deploy",
+    "rinkeby": "yarn hardhat deploy --network rinkeby"
   }
 }
