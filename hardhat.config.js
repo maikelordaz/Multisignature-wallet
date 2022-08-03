@@ -7,6 +7,9 @@ require("hardhat-contract-sizer")
 require("dotenv").config()
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY
+const ALICE_PRIVATE_KEY = process.env.ALICE_PRIVATE_KEY
+const BOB_PRIVATE_KEY = process.env.BOB_PRIVATE_KEY
+const CHARLIE_PRIVATE_KEY = process.env.CHARLIE_PRIVATE_KEY
 const RINKEBY_RPC_URL = process.env.RINKEBY_RPC_URL
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY
@@ -25,7 +28,7 @@ module.exports = {
         },
         rinkeby: {
             chainId: 4,
-            accounts: [PRIVATE_KEY],
+            accounts: [PRIVATE_KEY, ALICE_PRIVATE_KEY, BOB_PRIVATE_KEY, CHARLIE_PRIVATE_KEY],
             url: RINKEBY_RPC_URL,
             blockConfirmations: 6,
         },
